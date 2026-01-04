@@ -47,12 +47,12 @@ data:
 ## Clean raw data and generate processed dataset
 .PHONY: clean_data
 clean_data:
-	jupyter nbconvert --to notebook --execute notebooks/1.0-*-nettoyage-pyspark.ipynb
+	jupyter nbconvert --to notebook --execute notebooks/nettoyage-pyspark.ipynb
 
 ## Train models
 .PHONY: train
 train:
-	$(PYTHON_INTERPRETER) -m $(PROJECT_NAME).modeling.train
+	jupyter nbconvert --to notebook --execute notebooks/apprentissage-pyspark.ipynb
 
 
 

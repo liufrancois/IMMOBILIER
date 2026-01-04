@@ -1,7 +1,3 @@
-# ============================================================
-# PROJET SCRAP IMMOBILIER - immo-entre-particuliers.com
-# Questions 1 -> 7 — Version complète et corrigée
-# ============================================================
 
 import re
 import csv
@@ -14,9 +10,6 @@ import requests
 from bs4 import BeautifulSoup
 
 
-# ------------------------------------------------------------
-# Session HTTP réutilisable (recommandé)
-# ------------------------------------------------------------
 _SESSION = requests.Session()
 _SESSION.headers.update({
     "User-Agent": (
@@ -28,17 +21,12 @@ _SESSION.headers.update({
 })
 
 
-# ============================================================
-# QUESTION 2 — Exception NonValide
-# ============================================================
 class NonValide(Exception):
-    """Exception levée lorsqu'une annonce ne respecte pas les critères de sélection."""
+    """
+    Exception levée lorsqu'une annonce ne respecte pas les critères de sélection.
+    """
     pass
 
-
-# ============================================================
-# Helpers (texte visible / nettoyage)
-# ============================================================
 def _clean(s: str) -> str:
     s = s.replace("\xa0", " ")
     s = " ".join(s.split())
@@ -55,9 +43,6 @@ def _is_visible_text_node(node) -> bool:
     return parent.name not in {"script", "style", "noscript"}
 
 
-# ============================================================
-# QUESTION 1 — getsoup(url)
-# ============================================================
 def getsoup(url: str, timeout: int = 15, retries: int = 2, sleep_retry: float = 0.8) -> BeautifulSoup:
     """
     Télécharge une page HTML et renvoie la soupe correspondante.
@@ -78,9 +63,6 @@ def getsoup(url: str, timeout: int = 15, retries: int = 2, sleep_retry: float = 
     raise last_exc
 
 
-# ============================================================
-# QUESTION 3 — prix(soup)
-# ============================================================
 def prix(soup: BeautifulSoup) -> str:
     """
     Renvoie le prix (string) sans le symbole €.
@@ -89,7 +71,7 @@ def prix(soup: BeautifulSoup) -> str:
     marker = soup.find(string=re.compile(r"\bà vendre\b", re.IGNORECASE))
     euro_pattern = re.compile(r"€\s*[\d\s\u00A0]+|[\d\s\u00A0]+€")
 
-    # On évite de matcher dans les scripts
+    #On évite de matcher dans les scripts
     def find_price_text():
         if marker:
             for node in marker.find_all_next(string=euro_pattern):
@@ -115,9 +97,6 @@ def prix(soup: BeautifulSoup) -> str:
     return digits
 
 
-# ============================================================
-# QUESTION 4 — ville(soup)
-# ============================================================
 def ville(soup: BeautifulSoup) -> str:
     """
     Renvoie la ville où se trouve le bien.
@@ -137,11 +116,10 @@ def ville(soup: BeautifulSoup) -> str:
 
         txt = _clean(str(node))
 
-        # Filtre anti-JSON/URL
+        #Filtre anti-JSON/URL
         if "http" in txt or '"url"' in txt or "{" in txt or "}" in txt:
             continue
 
-        # Un breadcrumb correct contient généralement plusieurs virgules
         if txt.count(",") < 3:
             continue
 
@@ -152,7 +130,6 @@ def ville(soup: BeautifulSoup) -> str:
     if not candidates:
         raise NonValide("Localisation introuvable (donc ville introuvable).")
 
-    # En pratique, le breadcrumb visible est souvent le plus court
     loc = min(candidates, key=len)
 
     idx = loc.rfind(", ")
@@ -161,10 +138,6 @@ def ville(soup: BeautifulSoup) -> str:
 
     return loc[idx + 2:].strip()
 
-
-# ============================================================
-# QUESTION 5 — Bloc caractéristiques + extracteurs
-# ============================================================
 def caracteristiques(soup: BeautifulSoup) -> BeautifulSoup:
     """
     Renvoie la balise contenant le bloc de caractéristiques.
@@ -192,7 +165,7 @@ def caracteristiques(soup: BeautifulSoup) -> BeautifulSoup:
                 return tag
             tag = tag.parent
 
-    return soup  # fallback
+    return soup
 
 
 def _extract_value(root: BeautifulSoup, label_regex: str) -> str:
@@ -205,7 +178,6 @@ def _extract_value(root: BeautifulSoup, label_regex: str) -> str:
 
     label_tag = label_node.parent
 
-    # Cas tableau
     tr = label_tag.find_parent("tr")
     if tr:
         cells = tr.find_all(["td", "th"])
@@ -218,7 +190,6 @@ def _extract_value(root: BeautifulSoup, label_regex: str) -> str:
             if t:
                 return t
 
-    # Cas "ligne" : sibling suivant
     parent = label_tag.parent
     if parent:
         children = [c for c in parent.children if getattr(c, "get_text", None)]
@@ -229,7 +200,6 @@ def _extract_value(root: BeautifulSoup, label_regex: str) -> str:
                     if cand and not re.fullmatch(label_regex, cand, flags=re.IGNORECASE):
                         return cand
 
-    # Fallback
     nxt = label_tag.find_next(string=True)
     while nxt is not None:
         if _is_visible_text_node(nxt):
@@ -249,7 +219,6 @@ def _digits_or_dash(value: str) -> str:
     return d if d else "-"
 
 
-# NOTE: demandé par l'énoncé -> masque le builtin Python type()
 def type(soup: BeautifulSoup) -> str:
     """
     Renvoie le type du bien.
@@ -299,10 +268,6 @@ def nbrsdb(soup: BeautifulSoup) -> str:
 
 
 def dpe(soup: BeautifulSoup) -> str:
-    """
-    Renvoie la lettre DPE (A..G) si trouvée ; sinon "-" si manquant.
-    (Conforme à l'énoncé.)
-    """
     root = caracteristiques(soup)
     try:
         raw = _clean(_extract_value(root, r"DEP|DPE|Consommation\s+d'?énergie"))
@@ -316,16 +281,7 @@ def dpe(soup: BeautifulSoup) -> str:
     return m.group(1).upper() if m else raw
 
 
-# ============================================================
-# QUESTION 6 — informations(soup)
-# ============================================================
 def informations_fields(soup: BeautifulSoup) -> List[str]:
-    """
-    Renvoie les champs dans l'ordre :
-    Ville,Type,Surface,NbrPieces,NbrChambres,NbrSdb,DPE,Prix
-
-    Lève NonValide si annonce non conforme (prix < 10k, type non autorisé, etc.).
-    """
     return [
         ville(soup),
         type(soup),
@@ -339,20 +295,13 @@ def informations_fields(soup: BeautifulSoup) -> List[str]:
 
 
 def informations(soup: BeautifulSoup) -> str:
-    """
-    Version demandée : une chaîne CSV.
-    """
     return ",".join(informations_fields(soup))
 
 
-# ============================================================
-# QUESTION 7 — Parcourir les résultats IDF vente + écrire CSV
-# ============================================================
 
-# Pattern d'URL d'annonce
 _AD_URL_RE = re.compile(r"/annonce-[^/]+/\d+", re.IGNORECASE)
 
-# URLs de départ (IDF - ventes - offres)
+#URLs de départ
 START_URLS_IDF = [
     "https://ile-de-france.immo-entre-particuliers.com/annonces/france-ile-de-france/vente/maison/",
     "https://ile-de-france.immo-entre-particuliers.com/annonces/france-ile-de-france/vente/appartement/",
@@ -373,20 +322,17 @@ def extract_ad_urls(listing_soup: BeautifulSoup, page_url: str) -> Set[str]:
 
 def find_next_page_url(listing_soup: BeautifulSoup, page_url: str) -> Optional[str]:
     """
-    Trouve l'URL de la page suivante (pagination).
+    Trouve l'URL de la page suivante.
     """
-    # rel="next"
     link_next = listing_soup.find("a", attrs={"rel": re.compile(r"\bnext\b", re.IGNORECASE)}, href=True)
     if link_next and link_next.get("href"):
         return urljoin(page_url, link_next["href"])
 
-    # texte "Suivant"
     for a in listing_soup.find_all("a", href=True):
         txt = a.get_text(" ", strip=True).lower()
         if "suivant" in txt:
             return urljoin(page_url, a["href"])
 
-    # class/id "next"
     for a in listing_soup.find_all("a", href=True):
         attrs = " ".join(a.get("class", [])).lower() + " " + str(a.get("id", "")).lower()
         if "next" in attrs:
@@ -405,10 +351,7 @@ def scrape_idf_sales_to_csv(
 ) -> None:
     """
     Parcourt toutes les pages de résultats IDF (ventes maison + ventes appartement),
-    appelle informations_fields() sur chaque annonce, et écrit un CSV.
-
-    1ère ligne du CSV :
-      Ville,Type,Surface,NbrPieces,NbrChambres,NbrSdb,DPE,Prix
+    appelle informations_fields() sur chaque annonce, et écrit dans le CSV.
     """
     header = ["Ville", "Type", "Surface", "NbrPieces", "NbrChambres", "NbrSdb", "DPE", "Prix"]
 
@@ -450,7 +393,7 @@ def scrape_idf_sales_to_csv(
 
                     try:
                         ad_soup = getsoup(ad_url)
-                        row = informations_fields(ad_soup)  # -> liste de champs
+                        row = informations_fields(ad_soup)
                         writer.writerow(row)
                         valid_ads += 1
 
@@ -476,22 +419,14 @@ def scrape_idf_sales_to_csv(
     print(f"\n[END] Visitées={total_ads} | Valides={valid_ads} | Ignorées={skipped_ads} | CSV={output_csv}", flush=True)
 
 
-# ============================================================
-# MAIN — Test annonce / Scrap complet
-# ============================================================
 if __name__ == "__main__":
-    # Mode scraping complet IDF :
-    #   python scrap.py --idf idf_ventes.csv
-    #
-    # Mode test (par défaut) :
-    #   python scrap.py
 
     if len(sys.argv) >= 2 and sys.argv[1] == "--idf":
         out = sys.argv[2] if len(sys.argv) >= 3 else "data/raw/idf_ventes.csv"
         scrape_idf_sales_to_csv(output_csv=out)
         sys.exit(0)
 
-    # Test simple sur une annonce
+    #Test simple sur une annonce
     test_url = "https://www.immo-entre-particuliers.com/annonce-gironde-bordeaux/411049-grande-echoppe-de-charme-a-renover-avec-250m2-jardin-plein-sud-et-dependance-bordeaux-camille-godard"
     soup = getsoup(test_url)
 
