@@ -1,0 +1,93 @@
+#################################################################################
+# GLOBALS                                                                       #
+#################################################################################
+
+PROJECT_NAME = IMMOBILIER
+PYTHON_VERSION = 3.10
+PYTHON_INTERPRETER = python
+
+#################################################################################
+# COMMANDS                                                                      #
+#################################################################################
+
+
+## Install Python dependencies
+.PHONY: requirements
+requirements:
+	$(PYTHON_INTERPRETER) -m pip install -U pip
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
+	
+
+
+
+## Delete all compiled Python files
+.PHONY: clean
+clean:
+	find . -type f -name "*.py[co]" -delete
+	find . -type d -name "__pycache__" -delete
+
+
+## Lint using ruff (use `make format` to do formatting)
+.PHONY: lint
+lint:
+	ruff format --check
+	ruff check
+
+## Format source code with ruff
+.PHONY: format
+format:
+	ruff check --fix
+	ruff format
+
+## Scrape raw real estate data (IDF)
+.PHONY: data
+data:
+	$(PYTHON_INTERPRETER) -m $(PROJECT_NAME).dataset --idf
+
+## Clean raw data and generate processed dataset
+.PHONY: clean_data
+clean_data:
+	jupyter nbconvert --to notebook --execute notebooks/1.0-*-nettoyage-pyspark.ipynb
+
+## Train models
+.PHONY: train
+train:
+	$(PYTHON_INTERPRETER) -m $(PROJECT_NAME).modeling.train
+
+
+
+
+## Set up Python interpreter environment
+.PHONY: create_environment
+create_environment:
+	
+	conda create --name $(PROJECT_NAME) python=$(PYTHON_VERSION) -y
+	
+	@echo ">>> conda env created. Activate with:\nconda activate $(PROJECT_NAME)"
+	
+
+
+
+#################################################################################
+# PROJECT RULES                                                                 #
+#################################################################################
+
+
+
+#################################################################################
+# Self Documenting Commands                                                     #
+#################################################################################
+
+.DEFAULT_GOAL := help
+
+define PRINT_HELP_PYSCRIPT
+import re, sys; \
+lines = '\n'.join([line for line in sys.stdin]); \
+matches = re.findall(r'\n## (.*)\n[\s\S]+?\n([a-zA-Z_-]+):', lines); \
+print('Available rules:\n'); \
+print('\n'.join(['{:25}{}'.format(*reversed(match)) for match in matches]))
+endef
+export PRINT_HELP_PYSCRIPT
+
+help:
+	@$(PYTHON_INTERPRETER) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)

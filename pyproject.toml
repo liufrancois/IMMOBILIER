@@ -1,0 +1,32 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "IMMOBILIER"
+version = "0.0.1"
+description = "L\u2019objectif de ce projet est de pr\u00e9dire le prix de vente de maisons et d\u2019appartements \u00e0 partir de leurs caract\u00e9ristiques (ville, type de bien, surface, nombre de pi\u00e8ces, nombre de chambres, nombre de salles de bain, DPE, etc.). Les donn\u00e9es proviennent du site d\u2019annonces immobili\u00e8res entre particuliers immo-entre-particuliers.com. Le projet met en \u0153uvre une cha\u00eene compl\u00e8te de traitement allant de la collecte automatique des donn\u00e9es par web scraping jusqu\u2019\u00e0 la mod\u00e9lisation en apprentissage automatique avec PySpark."
+authors = [
+  { name = "GUEBOUL ILYES / FRANCOIS LIU" },
+]
+
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    
+]
+requires-python = "~=3.10.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["IMMOBILIER"]
+include = ["pyproject.toml", "IMMOBILIER/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["IMMOBILIER"]
+force-sort-within-sections = true
+
